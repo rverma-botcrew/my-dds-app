@@ -66,3 +66,32 @@ cd ~/cyclonedds-cxx/build/bin
 # In second terminal
 ./ddscxxHelloworldSubscriber
 ```
+
+Now we need to create our package
+```
+cd ~
+mkdir my-dds-app
+cd my-dds-app
+mkdir -p build/gen
+```
+Now we create the header files from the idl message
+```
+cd build/gen
+idlc -l cxx ../../idl/StringMessage.idl
+```
+Here `-l cxx` tells the compiler will give cpp files for the headers and source files for the message. This will create the `.cpp` and `.hpp` files for the idl message in the current directory. 
+
+Now we build the package
+```
+cd ~/my-dds-app/build
+cmake .. -DCMAKE_PREFIX_PATH="$CYCLONE_INSTALL;$CXX_INSTALL"
+make -j$(nproc) 
+```
+Now lets test out files
+```
+# First Terminal
+./publisher
+
+# Second Terminal
+./subscriber
+```

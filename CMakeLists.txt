@@ -1,51 +1,51 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.5)
 project(my_dds_app LANGUAGES CXX)
 
-# Require C++17
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Ensure install prefixes are set
-if(NOT DEFINED ENV{CYCLONE_INSTALL} OR NOT DEFINED ENV{CXX_INSTALL})
-  message(FATAL_ERROR
-    "Please set CYCLONE_INSTALL (CycloneDDS core) and CXX_INSTALL (CycloneDDS-CXX) in your environment")
-endif()
-
-# Add both CycloneDDS core and C++ binding to the prefix path
+# 1) Let CMake look under your custom DDS prefixes
 list(APPEND CMAKE_PREFIX_PATH
-     "$ENV{CYCLONE_INSTALL}"
-     "$ENV{CXX_INSTALL}")
+  "$ENV{CYCLONE_INSTALL}"
+  "$ENV{CXX_INSTALL}"
+)
+message(STATUS "CMAKE_PREFIX_PATH = ${CMAKE_PREFIX_PATH}")
 
-# Find CycloneDDS-CXX package
-find_package(CycloneDDS-CXX REQUIRED)
+# 2) Pull in Iceoryx C binding (installed via apt)
+find_package(iceoryx_binding_c CONFIG REQUIRED)
+# (if you also need iceoryx_posh directly, you can do:
+#  find_package(iceoryx_posh CONFIG REQUIRED)
+# )
 
-# Where your IDL files live
-set(IDL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/idl")
+# 3) Pull in CycloneDDS C++ wrapper
+find_package(CycloneDDS-CXX CONFIG REQUIRED)
 
-# Generate C++ types from IDL
-idlcxx_generate(
-  TARGET example_types
-  FILES "${IDL_DIR}/StringMessage.idl"
+# 4) Where your IDL‐generated code lives
+set(GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/gen")
+
+# 5) Publisher
+add_executable(publisher
+  src/publisher.cpp
+  ${GEN_DIR}/StringMessage.cpp
+)
+target_include_directories(publisher PRIVATE
+  ${GEN_DIR}
+  $ENV{CXX_INSTALL}/include
+)
+target_link_libraries(publisher PRIVATE
+  iceoryx_binding_c::iceoryx_binding_c
+  CycloneDDS-CXX::ddscxx
 )
 
-# Define the application
-add_executable(my_dds_app
-  src/main.cpp
+# 6) Subscriber
+add_executable(subscriber
+  src/subscriber.cpp
+  ${GEN_DIR}/StringMessage.cpp
 )
-
-add_executable(yapper src/yapper.cpp)
-target_link_libraries(yapper PRIVATE example_types CycloneDDS-CXX::ddscxx)
-
-add_executable(lethimcook src/lethimcook.cpp)
-target_link_libraries(lethimcook PRIVATE example_types CycloneDDS-CXX::ddscxx)
-
-
-# Link against the generated types and CycloneDDS-CXX
-target_link_libraries(my_dds_app
-  PRIVATE
-    example_types
-    CycloneDDS-CXX::ddscxx
+target_include_directories(subscriber PRIVATE 
+  ${GEN_DIR}
+  $ENV{CXX_INSTALL}/include
+  )
+target_link_libraries(subscriber PRIVATE
+  iceoryx_binding_c::iceoryx_binding_c
+  CycloneDDS-CXX::ddscxx
 )
-
-# Optional: install the executable
-install(TARGETS my_dds_app RUNTIME DESTINATION bin)
